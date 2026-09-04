@@ -1,0 +1,231 @@
+version: '3.8'
+
+x-logging-defaults: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  # One-shot Laravel Initialization Service (Migrations, Cache, Dependencies)
+  app-init:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runner
+    image: laravel-app:dev
+    container_name: laravel_app_init
+    logging: *default-logging
+    volumes:
+      - ./:/var/www/html:delegated
+      - ./docker/php/custom.ini:/usr/local/etc/php/conf.d/custom.ini:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: ["/bin/bash", "./docker/php/init.sh"]
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+
+  # Laravel PHP-FPM Application Service
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runner
+    image: laravel-app:dev
+    container_name: laravel_app
+    restart: unless-stopped
+    logging: *default-logging
+    volumes:
+      - ./:/var/www/html:delegated
+      - ./docker/php/custom.ini:/usr/local/etc/php/conf.d/custom.ini:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      app-init:
+        condition: service_completed_successfully
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 1G
+        reservations:
+          memory: 256M
+
+  # Nginx Web Server Service with Certbot SSL Support
+  web:
+    build:
+      context: ./docker/nginx
+      dockerfile: Dockerfile
+    image: laravel-web:dev
+    container_name: laravel_web
+    restart: unless-stopped
+    logging: *default-logging
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./:/var/www/html:ro
+      - ./docker/nginx/conf.d:/etc/nginx/conf.d
+      - ./docker/nginx/letsencrypt:/etc/letsencrypt
+      - ./docker/nginx/letsencrypt-lib:/var/lib/letsencrypt
+      - ./docker/nginx/letsencrypt-acme:/var/www/acme-challenge
+    depends_on:
+      app:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://127.0.0.1/robots.txt || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 384M
+
+  # PostgreSQL Database Service
+  postgres:
+    image: postgres:16-alpine
+    container_name: laravel_postgres
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-laravel}
+      POSTGRES_USER: ${DB_USERNAME:-laravel_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-secret_password}
+    command: ["postgres", "-c", "max_wal_size=1GB", "-c", "min_wal_size=80MB", "-c", "max_slot_wal_keep_size=1024MB"]
+    ports:
+      - "127.0.0.1:${FORWARD_DB_PORT:-5432}:5432"
+    volumes:
+      - ./docker/data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-laravel_user} -d ${DB_DATABASE:-laravel}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+
+  # Redis Cache & Queue Storage Service
+  redis:
+    image: redis:7-alpine
+    container_name: laravel_redis
+    restart: unless-stopped
+    logging: *default-logging
+    command: redis-server --appendonly yes --auto-aof-rewrite-percentage 100 --auto-aof-rewrite-min-size 64mb --maxmemory 200mb --maxmemory-policy volatile-lru
+    ports:
+      - "127.0.0.1:${FORWARD_REDIS_PORT:-6379}:6379"
+    volumes:
+      - ./docker/data/redis:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+  # Laravel Artisan Queue Worker Service
+  queue:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runner
+    image: laravel-app:dev
+    container_name: laravel_queue
+    restart: unless-stopped
+    logging: *default-logging
+    command: php artisan queue:work redis --tries=3 --timeout=90
+    # Disable the PHP-FPM healthcheck inherited from the image — queue worker
+    # does not run php-fpm and port 9000 is never open here.
+    healthcheck:
+      disable: true
+    volumes:
+      - ./:/var/www/html:delegated
+      - ./docker/php/custom.ini:/usr/local/etc/php/conf.d/custom.ini:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      app-init:
+        condition: service_completed_successfully
+
+  # Laravel Task Scheduler Service
+  scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runner
+    image: laravel-app:dev
+    container_name: laravel_scheduler
+    restart: unless-stopped
+    logging: *default-logging
+    command: php artisan schedule:work
+    # Disable the PHP-FPM healthcheck inherited from the image — scheduler
+    # does not run php-fpm and port 9000 is never open here.
+    healthcheck:
+      disable: true
+    volumes:
+      - ./:/var/www/html:delegated
+      - ./docker/php/custom.ini:/usr/local/etc/php/conf.d/custom.ini:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      app-init:
+        condition: service_completed_successfully
+
+  # Dozzle Credentials Generator (Init step)
+  dozzle-init:
+    build:
+      context: ./docker/dozzle
+      dockerfile: Dockerfile.init
+    container_name: laravel_dozzle_init
+    volumes:
+      - ./docker/dozzle:/data
+    environment:
+      - DOZZLE_USER=${DOZZLE_USER:-admin}
+      - DOZZLE_PASSWORD=${DOZZLE_PASSWORD:-secret_password}
+      - DOZZLE_EMAIL=${DOZZLE_EMAIL:-admin@example.com}
+    command:
+      - |
+        /usr/local/bin/dozzle generate ${DOZZLE_USER:-admin} --password ${DOZZLE_PASSWORD:-secret_password} --email ${DOZZLE_EMAIL:-admin@example.com} --name "Admin" > /data/users.yml
+
+  # Lightweight Web Log Viewer Service (Dozzle)
+  dozzle:
+    image: amir20/dozzle:latest
+    container_name: laravel_dozzle
+    restart: unless-stopped
+    environment:
+      - DOZZLE_AUTH_PROVIDER=simple
+      - DOZZLE_BASE=/dozzle
+    ports:
+      - "127.0.0.1:8888:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./docker/dozzle:/data:ro
+    depends_on:
+      dozzle-init:
+        condition: service_completed_successfully
+    deploy:
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: 64M

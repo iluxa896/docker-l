@@ -1,0 +1,37 @@
+/.phpunit.cache
+/node_modules
+/public/build
+/public/hot
+/public/storage
+/storage/*.key
+/vendor
+.env
+.env.backup
+.env.production
+.phpunit.result.cache
+Homestead.json
+Homestead.yaml
+auth.json
+npm-debug.log
+yarn-error.log
+roadmap.md
+project_rules.md
+history.md
+/.fleet
+/.idea
+/.vscode
+laravel
+/docker/dozzle/users.yml
+/docker/data/
+
+# SSL & Let's Encrypt Volumes and Keys
+/docker/letsencrypt/
+/docker/letsencrypt-lib/
+/docker/nginx/letsencrypt/
+/docker/nginx/letsencrypt-lib/
+/docker/nginx/letsencrypt-acme/
+/_docker/letsencrypt/
+*.pem
+
+# Nginx Local Config (template is default.conf.example)
+/docker/nginx/conf.d/default.conf

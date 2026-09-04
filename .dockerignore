@@ -1,0 +1,38 @@
+# Build context exclusions for Laravel & Docker
+
+.git
+.gitignore
+.gitattributes
+
+# Dependency & build directories
+/vendor
+/node_modules
+/public/build
+/public/storage
+
+# Environment & local secrets
+.env
+.env.*
+!.env.example
+
+# IDE & Editor files
+.idea
+.vscode
+*.swp
+*.swo
+
+# Docker files
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# Storage & framework logs/caches
+/storage/logs/*
+/storage/framework/cache/*
+/storage/framework/sessions/*
+/storage/framework/views/*
+/storage/app/public/*
+
+# OS generated files
+.DS_Store
+Thumbs.db

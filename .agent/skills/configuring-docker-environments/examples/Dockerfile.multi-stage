@@ -1,0 +1,60 @@
+# Universal Production Multi-Stage Dockerfile Template
+# Hardened, lightweight, non-root, init-handled
+
+# -----------------------------------------------------------------------------
+# Stage 1: Build Dependencies & Source Code Compilation
+# -----------------------------------------------------------------------------
+FROM node:20-alpine AS builder
+
+WORKDIR /build
+
+# Optimize layer caching by copying dependency manifests first
+COPY package*.json ./
+
+# Install all dependencies (including devDependencies required for build)
+RUN npm ci
+
+# Copy source code and perform production build
+COPY . .
+RUN npm run build && npm prune --production
+
+# -----------------------------------------------------------------------------
+# Stage 2: Minimal Unprivileged Production Runtime Environment
+# -----------------------------------------------------------------------------
+FROM node:20-alpine AS runner
+
+LABEL org.opencontainers.image.title="Production Application Container" \
+      org.opencontainers.image.licenses="MIT"
+
+WORKDIR /app
+
+# Install lightweight init process (reaps zombie processes & handles signals)
+RUN apk add --no-cache tini
+
+# Security: Create non-root system user and group with fixed UID/GID
+RUN addgroup -S appgroup -g 10001 && \
+    adduser -S appuser -u 10001 -G appgroup
+
+# Copy compiled assets and pruned production dependencies from builder stage
+COPY --from=builder --chown=appuser:appgroup /build/node_modules ./node_modules
+COPY --from=builder --chown=appuser:appgroup /build/dist ./dist
+COPY --from=builder --chown=appuser:appgroup /build/package.json ./package.json
+
+# Switch to unprivileged system user
+USER appuser:appgroup
+
+# Configure environment variables
+ENV NODE_ENV=production \
+    PORT=3000
+
+EXPOSE 3000
+
+# Container Health Check
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1
+
+# Use Tini as Init Process Entrypoint
+ENTRYPOINT ["/sbin/tini", "--"]
+
+# Start Application Process
+CMD ["node", "dist/server.js"]

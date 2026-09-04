@@ -1,0 +1,3 @@
+FROM alpine:3.19
+COPY --from=amir20/dozzle:latest /dozzle /usr/local/bin/dozzle
+ENTRYPOINT ["/bin/sh", "-c"]

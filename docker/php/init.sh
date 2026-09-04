@@ -12,7 +12,7 @@ if [ ! -f .env ] && [ -f .env.example ]; then
 fi
 
 # 1. Ensure required framework directories exist
-mkdir -p vendor storage/framework/{sessions,views,cache} storage/logs bootstrap/cache public/storage
+mkdir -p vendor storage/framework/{sessions,views,cache} storage/logs bootstrap/cache public/storage public/build
 
 # 2. Allow Composer execution as superuser in init container
 export COMPOSER_ALLOW_SUPERUSER=1
@@ -20,6 +20,17 @@ export COMPOSER_ALLOW_SUPERUSER=1
 # 3. Composer Dependencies
 echo "📦 Checking and installing Composer dependencies..."
 composer install --no-interaction --prefer-dist --optimize-autoloader
+
+# 4. Frontend Assets Build (Vite)
+if [ ! -f public/build/manifest.json ]; then
+    echo "🎨 Building frontend assets with Vite..."
+    if [ -f package-lock.json ]; then
+        npm ci --no-audit --prefer-offline 2>/dev/null || npm install --no-audit
+    else
+        npm install --no-audit
+    fi
+    npm run build
+fi
 
 # 4. Application Key Check
 if [ -f .env ]; then
@@ -60,7 +71,7 @@ php artisan queue:restart --no-interaction || true
 # 9. Automatically assign permissions to non-root appuser (10001:10001) for runtime containers
 # Note: Do NOT chown /var/www/html blindly, as docker/data belongs to postgres (UID 70) and redis (UID 999)
 echo "🔒 Applying ownership & permissions for appuser (10001:10001)..."
-chown -R 10001:10001 storage bootstrap/cache vendor public/storage 2>/dev/null || true
+chown -R 10001:10001 storage bootstrap/cache vendor public/storage public/build node_modules 2>/dev/null || true
 chmod -R 775 storage bootstrap/cache 2>/dev/null || true
 if [ -f .env ]; then
     chown 10001:10001 .env 2>/dev/null || true

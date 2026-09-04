@@ -204,6 +204,7 @@ services:
       dockerfile: Dockerfile.init
     pull_policy: build
     container_name: laravel_dozzle_init
+    logging: *default-logging
     volumes:
       - ./docker/dozzle:/data
     environment:
@@ -219,6 +220,7 @@ services:
     image: amir20/dozzle:latest
     container_name: laravel_dozzle
     restart: unless-stopped
+    logging: *default-logging
     environment:
       - DOZZLE_AUTH_PROVIDER=simple
       - DOZZLE_BASE=/dozzle
@@ -234,4 +236,6 @@ services:
       resources:
         limits:
           cpus: '0.2'
-          memory: 64M
+          memory: 128M
+        reservations:
+          memory: 32M

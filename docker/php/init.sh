@@ -58,9 +58,13 @@ echo "🔄 Signal queue workers to restart..."
 php artisan queue:restart --no-interaction || true
 
 # 9. Automatically assign permissions to non-root appuser (10001:10001) for runtime containers
+# Note: Do NOT chown /var/www/html blindly, as docker/data belongs to postgres (UID 70) and redis (UID 999)
 echo "🔒 Applying ownership & permissions for appuser (10001:10001)..."
-chown -R 10001:10001 /var/www/html 2>/dev/null || true
+chown -R 10001:10001 storage bootstrap/cache vendor public/storage 2>/dev/null || true
 chmod -R 775 storage bootstrap/cache 2>/dev/null || true
+if [ -f .env ]; then
+    chown 10001:10001 .env 2>/dev/null || true
+fi
 
 echo "=================================================="
 echo "✅ [Init Container] Initialization completed successfully!"

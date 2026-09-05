@@ -12,7 +12,7 @@ if [ ! -f .env ] && [ -f .env.example ]; then
 fi
 
 # 1. Ensure required framework directories exist
-mkdir -p vendor storage/framework/{sessions,views,cache} storage/logs bootstrap/cache public/storage public/build
+mkdir -p vendor storage/app/public storage/framework/{sessions,views,cache} storage/logs bootstrap/cache public/build
 
 # 2. Allow Composer execution as superuser in init container
 export COMPOSER_ALLOW_SUPERUSER=1
@@ -42,7 +42,13 @@ fi
 
 # 5. Storage Symlink
 echo "🔗 Creating storage symlink..."
-php artisan storage:link --no-interaction 2>/dev/null || true
+if [ -d public/storage ] && [ ! -L public/storage ]; then
+    echo "⚠️ public/storage was a physical directory, removing to recreate as symlink..."
+    rm -rf public/storage
+fi
+if [ ! -L public/storage ]; then
+    php artisan storage:link --relative --no-interaction 2>/dev/null || php artisan storage:link --no-interaction 2>/dev/null || true
+fi
 
 # 6. Database Migrations
 echo "🗄️ Running database migrations..."

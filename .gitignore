@@ -20,6 +20,7 @@ history.md
 /.fleet
 /.idea
 /.vscode
+/.git
 laravel
 /docker/dozzle/users.yml
 /docker/data/

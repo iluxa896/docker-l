@@ -5,24 +5,32 @@ echo "=================================================="
 echo "🚀 [Init Container] Starting Laravel Initialization"
 echo "=================================================="
 
-# 0. Automatically create .env from template if missing on fresh deployment
+# 1. Automatically create .env from template if missing on fresh deployment
 if [ ! -f .env ] && [ -f .env.example ]; then
     echo "📋 .env not found. Creating from .env.example..."
     cp .env.example .env
 fi
 
-# 1. Ensure required framework directories exist
+# 2. Ensure required framework directories exist before any PHP execution
 mkdir -p vendor storage/app/public storage/framework/{sessions,views,cache} storage/logs bootstrap/cache public/build
 
-# 2. Allow Composer execution as superuser in init container
+# 3. Allow Composer execution as superuser in init container
 export COMPOSER_ALLOW_SUPERUSER=1
 
-# 3. Composer Dependencies
+# 4. Composer Dependencies
 echo "📦 Checking and installing Composer dependencies..."
 composer install --no-interaction --prefer-dist --optimize-autoloader
 
-# 4. Frontend Assets Build (Vite)
-if [ ! -f public/build/manifest.json ]; then
+# 5. Application Key Check (Generated before assets or migrations if missing)
+if [ -f .env ]; then
+    if ! grep -q "^APP_KEY=base64:" .env || [ -z "$(grep "^APP_KEY=" .env | cut -d '=' -f2)" ]; then
+        echo "🔑 APP_KEY is missing. Generating application key..."
+        php artisan key:generate --force --no-interaction
+    fi
+fi
+
+# 6. Frontend Assets Build (Vite)
+if [ ! -f public/build/manifest.json ] && [ ! -f public/build/.vite/manifest.json ]; then
     echo "🎨 Building frontend assets with Vite..."
     if [ -f package-lock.json ]; then
         npm ci --no-audit --prefer-offline 2>/dev/null || npm install --no-audit
@@ -32,55 +40,42 @@ if [ ! -f public/build/manifest.json ]; then
     npm run build
 fi
 
-# 4. Application Key Check
-if [ -f .env ]; then
-    if ! grep -q "^APP_KEY=base64:" .env || [ -z "$(grep "^APP_KEY=" .env | cut -d '=' -f2)" ]; then
-        echo "🔑 APP_KEY is missing. Generating application key..."
-        php artisan key:generate --force --no-interaction
-    fi
-fi
-
-# 5. Storage Symlink
-echo "🔗 Creating storage symlink..."
+# 7. Storage Symlink (Guards against physical folders and dangling/broken symlinks)
+echo "🔗 Verifying storage symlink..."
 if [ -d public/storage ] && [ ! -L public/storage ]; then
     echo "⚠️ public/storage was a physical directory, removing to recreate as symlink..."
     rm -rf public/storage
+elif [ -L public/storage ] && [ ! -e public/storage ]; then
+    echo "⚠️ public/storage was a broken symlink, removing to recreate..."
+    rm -f public/storage
 fi
+
 if [ ! -L public/storage ]; then
     php artisan storage:link --relative --no-interaction 2>/dev/null || php artisan storage:link --no-interaction 2>/dev/null || true
 fi
 
-# 6. Database Migrations
+# 8. Database Migrations
 echo "🗄️ Running database migrations..."
 php artisan migrate --force --no-interaction
 
-# 7. Cache & Optimization based on APP_ENV
-echo "⚡ Processing application caches for APP_ENV=${APP_ENV:-local}..."
-if [ "${APP_ENV}" = "production" ] || [ "${APP_ENV}" = "staging" ]; then
-    echo "🔒 Caching config, routes, events, and views for production..."
-    php artisan config:cache --no-interaction
-    php artisan route:cache --no-interaction
-    php artisan view:cache --no-interaction
-    php artisan event:cache --no-interaction
-else
-    echo "🧹 Clearing config, routes, views, and application caches for development..."
-    php artisan config:clear --no-interaction
-    php artisan route:clear --no-interaction
-    php artisan view:clear --no-interaction
-    php artisan cache:clear --no-interaction
-fi
+# 9. Cache & Optimization (Clears stale cache and precompiles config, routes, events, and views)
+echo "⚡ Optimizing application caches..."
+php artisan optimize:clear --no-interaction
+php artisan optimize --no-interaction
 
-# 8. Queue Workers Reset Signal (Signals Redis so running workers reboot gracefully)
+# 10. Queue Workers Reset Signal (Signals Redis so running workers reboot gracefully)
 echo "🔄 Signal queue workers to restart..."
 php artisan queue:restart --no-interaction || true
 
-# 9. Automatically assign permissions to non-root appuser (10001:10001) for runtime containers
+# 11. Automatically assign permissions to non-root appuser (10001:10001) for runtime containers
 # Note: Do NOT chown /var/www/html blindly, as docker/data belongs to postgres (UID 70) and redis (UID 999)
 echo "🔒 Applying ownership & permissions for appuser (10001:10001)..."
-chown -R 10001:10001 storage bootstrap/cache vendor public/storage public/build node_modules 2>/dev/null || true
+chown -R 10001:10001 storage bootstrap/cache vendor public/build node_modules 2>/dev/null || true
+chown -h 10001:10001 public/storage 2>/dev/null || true
 chmod -R 775 storage bootstrap/cache 2>/dev/null || true
 if [ -f .env ]; then
     chown 10001:10001 .env 2>/dev/null || true
+    chmod 640 .env 2>/dev/null || true
 fi
 
 echo "=================================================="

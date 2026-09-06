@@ -30,15 +30,13 @@ if [ -f .env ]; then
 fi
 
 # 6. Frontend Assets Build (Vite)
-if [ ! -f public/build/manifest.json ] && [ ! -f public/build/.vite/manifest.json ]; then
-    echo "🎨 Building frontend assets with Vite..."
-    if [ -f package-lock.json ]; then
-        npm ci --no-audit --prefer-offline 2>/dev/null || npm install --no-audit
-    else
-        npm install --no-audit
-    fi
-    npm run build
+echo "🎨 Building frontend assets with Vite..."
+if [ -f package-lock.json ]; then
+    npm ci --no-audit --prefer-offline 2>/dev/null || npm install --no-audit
+else
+    npm install --no-audit
 fi
+npm run build
 
 # 7. Storage Symlink (Guards against physical folders and dangling/broken symlinks)
 echo "🔗 Verifying storage symlink..."

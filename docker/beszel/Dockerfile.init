@@ -1,0 +1,14 @@
+FROM alpine:3.19
+
+RUN apk add --no-cache sqlite apache2-utils tini openssh-keygen && \
+    addgroup -S appgroup -g 10001 && \
+    adduser -S appuser -u 10001 -G appgroup
+
+COPY --from=henrygd/beszel:latest /beszel /usr/local/bin/beszel
+
+COPY init.sh /init.sh
+RUN chmod +x /init.sh
+
+USER appuser:appgroup
+
+ENTRYPOINT ["/sbin/tini", "--", "/init.sh"]

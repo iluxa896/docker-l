@@ -239,3 +239,68 @@ services:
           memory: 128M
         reservations:
           memory: 32M
+
+  # Beszel Admin Credentials Synchronizer (Init step)
+  beszel-init:
+    build:
+      context: ./docker/beszel
+      dockerfile: Dockerfile.init
+    pull_policy: build
+    user: "0:0"
+    container_name: laravel_beszel_init
+    logging: *default-logging
+    volumes:
+      - ./docker/data/beszel:/beszel_data
+    environment:
+      - BESZEL_USER_EMAIL=${BESZEL_USER_EMAIL:-admin@example.com}
+      - BESZEL_USER_PASSWORD=${BESZEL_USER_PASSWORD:-secret_password}
+
+  # Beszel Server & Container Monitoring Hub (Web UI & Historical SQLite Metrics)
+  beszel:
+    image: henrygd/beszel:latest
+    container_name: laravel_beszel
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      - APP_URL=${APP_URL:-http://localhost}/beszel
+      - USER_EMAIL=${BESZEL_USER_EMAIL:-admin@example.com}
+      - USER_PASSWORD=${BESZEL_USER_PASSWORD:-secret_password}
+    ports:
+      - "127.0.0.1:8090:8090"
+    volumes:
+      - ./docker/data/beszel:/beszel_data
+      - ./docker/data/beszel_socket:/beszel_socket
+    depends_on:
+      beszel-init:
+        condition: service_completed_successfully
+    deploy:
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: 96M
+        reservations:
+          memory: 32M
+
+  # Beszel Local Metric Collector Agent (Inter-container Docker statistics via Unix socket)
+  beszel-agent:
+    image: henrygd/beszel-agent:latest
+    container_name: laravel_beszel_agent
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      - LISTEN=/beszel_socket/beszel.sock
+      - KEY_FILE=/beszel_data/id_ed25519.pub
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./docker/data/beszel_socket:/beszel_socket
+      - ./docker/data/beszel:/beszel_data:ro
+    depends_on:
+      beszel:
+        condition: service_started
+    deploy:
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 48M
+        reservations:
+          memory: 16M

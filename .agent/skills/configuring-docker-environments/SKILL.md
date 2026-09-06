@@ -1,28 +1,38 @@
 ---
 name: configuring-docker-environments
 description: >-
-  Expert skill for crafting production-ready Dockerfiles and docker-compose setups
-  tailored to project scale (Dev, Staging, Enterprise/Prod). Evaluates project requirements,
-  prevents container disk space bloat (Docker log capping, stateful WAL/journal/binlog rotation),
-  enforces security hardening (non-root users, multi-stage builds), and configures healthchecks
-  and resource quotas for any technology stack. Use when the user asks to write, optimize,
-  or configure Docker, Dockerfiles, or docker-compose environments.
+  Expert skill for crafting production-ready Dockerfiles, docker-compose setups, and container
+  security hardening tailored to project scale. Prevents disk space bloat (Docker log capping,
+  database WAL/binlog rotation), enforces non-root users (USER 10001), multi-stage builds,
+  init signal handling (tini), healthchecks, and resource quotas. Use when creating or refactoring
+  Dockerfiles, configuring docker-compose.yml, auditing container security, or setting up deployment stacks.
 ---
 
 # Configuring Docker & Docker Compose Environments (Master Skill)
 
 ## When to use this skill
-- Writing or refactoring `Dockerfile` or `docker-compose.yml` for any service stack.
+- Writing or refactoring `Dockerfile`, `docker-compose.yml`, or `.dockerignore` for any service stack.
 - Assessing project scale (Dev/MVP vs Staging/Prod vs Enterprise High-Load) to select appropriate container architecture.
 - Preventing disk space bloat caused by container log runaway, uncontrolled database binary/WAL logs, or build cache leaks.
-- Implementing multi-stage builds, layer caching optimization, unprivileged non-root users (`USER 10001`), and init signal handling (`tini`).
+- Implementing multi-stage builds, layer caching optimization, unprivileged non-root users (`USER 10001:10001`), and init signal handling (`tini`).
 - Setting up container healthchecks (`HEALTHCHECK`), dependency ordering (`depends_on: condition: service_healthy`), and resource quotas (`cpus`, `memory`).
+- Running the Docker security and configuration linter tool (`scripts/docker-security-linter.mjs`).
 
 ---
 
-## Step 1: Project Scale Assessment Framework
+## 1. Degrees of Freedom Model
 
-Before generating Docker configurations, evaluate the project tier by asking or identifying these 4 key dimensions:
+| Freedom Level | Area | Application & Constraints |
+| :--- | :--- | :--- |
+| **High Freedom** | Architecture & Service Topologies | Deciding service boundaries, cache layers (Redis vs Memcached), proxy selections (Nginx, Traefik, Caddy), volume backup schedules. |
+| **Medium Freedom** | Base Images & Health Intervals | Base OS image tag selection (Alpine vs Debian slim), healthcheck intervals (`interval: 15s`, `retries: 3`), internal network naming. |
+| **Low Freedom** | Security Hardening & Log Capping | Mandatory non-root user (`USER 10001`), mandatory log rotation caps (`max-size: "10m"`, `max-file: "3"`), init signal wrapping (`tini`), `.dockerignore` exclusion of secrets. |
+
+---
+
+## 2. Project Scale Assessment Framework
+
+Before generating Docker configurations, evaluate the project tier across these 4 dimensions:
 
 | Dimension | Tier 1: Dev / MVP | Tier 2: Staging / Prod Standard | Tier 3: Enterprise High-Load |
 | :--- | :--- | :--- | :--- |
@@ -33,26 +43,28 @@ Before generating Docker configurations, evaluate the project tier by asking or 
 
 ---
 
-## Step 2: Mandatory Safety & Optimization Checklist
+## 3. Mandatory Safety & Optimization Checklist
 
-Execute this checklist for every Docker setup:
-
-- [ ] **1. Container Log Capping**
-  - Always enforce `logging: driver: "json-file"` with `max-size` and `max-file` options on all Compose services.
-- [ ] **2. Stateful Log & WAL Retention**
-  - Configure log/journal retention for any stateful service (PostgreSQL WAL, MySQL binlogs, Redis AOF, Nginx logs).
-- [ ] **3. Security & Non-Root User**
-  - Create a dedicated non-root group and user in `Dockerfile` (`USER 10001:10001`).
-- [ ] **4. Init Process & Signal Handling**
-  - Use `tini` or `dumb-init` to handle `SIGTERM`/`SIGINT` gracefully and reap zombie processes.
-- [ ] **5. Healthcheck & Service Dependency**
-  - Define explicit `HEALTHCHECK` for stateful/dependent services and use `depends_on: condition: service_healthy`.
-- [ ] **6. Build Cache & Ignore Rules**
-  - Include `.dockerignore` to exclude `node_modules`, `.git`, temporary files, and vendor directories.
+```markdown
+- [ ] 1. Container Log Capping
+      - Enforce logging: driver: "json-file" with max-size: "10m" and max-file: "3" on all Compose services.
+- [ ] 2. Stateful Log & WAL Retention
+      - Configure log/journal retention for any stateful service (PostgreSQL WAL, MySQL binlogs, Redis AOF, Nginx logs).
+- [ ] 3. Security & Non-Root User
+      - Create a dedicated non-root group and user in Dockerfile (USER 10001:10001).
+- [ ] 4. Init Process & Signal Handling
+      - Use tini or dumb-init to handle SIGTERM/SIGINT gracefully and reap zombie processes.
+- [ ] 5. Healthcheck & Service Dependency
+      - Define explicit HEALTHCHECK for stateful/dependent services and use depends_on: condition: service_healthy.
+- [ ] 6. Build Cache & Ignore Rules
+      - Include .dockerignore to exclude node_modules, .git, temporary files, and vendor directories.
+- [ ] 7. Automated Linting
+      - Run docker linter: node .agent/skills/configuring-docker-environments/scripts/docker-security-linter.mjs
+```
 
 ---
 
-## Workflow 1: Multi-Stage Dockerfile Hardening
+## 4. Multi-Stage Dockerfile Hardening
 
 For any backend or web application, separate build tooling from runtime dependencies:
 
@@ -88,84 +100,21 @@ CMD ["node", "server.js"]
 
 ---
 
-## Workflow 2: Universal Docker Compose Configuration
+## 5. Automated Docker Environment Verification
 
-Use a production-ready Compose configuration with log limits and healthchecks:
+Run the built-in security linter to audit Dockerfiles and docker-compose files:
 
-```yaml
-version: '3.8'
-
-x-logging-defaults: &default-logging
-  driver: "json-file"
-  options:
-    max-size: "10m"
-    max-file: "3"
-
-services:
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    restart: unless-stopped
-    logging: *default-logging
-    environment:
-      - NODE_ENV=production
-      - DB_HOST=db
-    depends_on:
-      db:
-        condition: service_healthy
-    deploy:
-      resources:
-        limits:
-          cpus: '1.5'
-          memory: 1G
-        reservations:
-          memory: 256M
-
-  db:
-    image: postgres:16-alpine
-    restart: unless-stopped
-    logging: *default-logging
-    environment:
-      POSTGRES_DB: app_db
-      POSTGRES_USER: app_user
-      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
-    volumes:
-      - db_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U app_user -d app_db"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-volumes:
-  db_data:
-    driver: local
+```bash
+node .agent/skills/configuring-docker-environments/scripts/docker-security-linter.mjs --path .
 ```
 
 ---
 
-## Workflow 3: Universal Disk Space & Log Bloat Prevention
+## 6. Quick Reference Tools & Resources
 
-To prevent containers from consuming 100% of host disk space:
-
-1. **Docker Daemon & Container Logs**:
-   - Set `max-size: "10m"` and `max-file: "3"` to limit log footprint per container to max 30MB.
-2. **Stateful Services (Databases / Caches / Web Servers)**:
-   - **PostgreSQL**: Set `wal_keep_size = '1GB'` or `max_slot_wal_keep_size` to prevent WAL buildup.
-   - **MySQL / MariaDB**: Set `binlog_expire_logs_seconds = 259200` (3 days) and `max_binlog_size = 100M`.
-   - **Redis**: Enable `aof-use-rdb-preamble yes` and configure `auto-aof-rewrite-percentage 100`.
-   - **Nginx / Web Servers**: Route access logs to `/dev/stdout` or rotate logs via `logrotate`.
-3. **Ephemeral Storage**:
-   - Use `tmpfs` mounts for temporary work directories (e.g. `/tmp`, `/var/cache`) to avoid overlay2 disk writes.
-
-> [!IMPORTANT]
-> Detailed disk bloat prevention patterns and docker maintenance procedures can be found in [container-disk-bloat-prevention.md](./resources/container-disk-bloat-prevention.md).
-
----
-
-## Quick Reference Tools & Resources
-
-- [Universal Production Docker Compose Template](./examples/docker-compose.universal.yml)
-- [Production Multi-Stage Dockerfile Template](./examples/Dockerfile.multi-stage)
-- [Container Disk Bloat & Log Prevention Guide](./resources/container-disk-bloat-prevention.md)
+- **Docker Security Linter**: [docker-security-linter.mjs](./scripts/docker-security-linter.mjs) - Node.js CLI script inspecting Dockerfiles and Compose configurations for log caps, non-root users, and healthchecks.
+- **Universal Compose Template**: [docker-compose.universal.yml](./examples/docker-compose.universal.yml) - Production-grade Compose setup with log caps, healthchecks, and Postgres data volume.
+- **Node.js Multi-Stage Dockerfile**: [Dockerfile.multi-stage](./examples/Dockerfile.multi-stage) - Multi-stage Node.js Dockerfile with tini and non-root execution.
+- **PHP-FPM & Nginx Dockerfile**: [Dockerfile.php-fpm-nginx](./examples/Dockerfile.php-fpm-nginx) - Hardened PHP 8.3/8.4 + Nginx multi-stage build with OPcache and socket IPC.
+- **Production Hardening Guide**: [docker-production-hardening.md](./references/docker-production-hardening.md) - Deep architectural guide on Linux namespaces, cgroups v2, capability dropping, and secrets.
+- **Disk Bloat Prevention Guide**: [container-disk-bloat-prevention.md](./resources/container-disk-bloat-prevention.md) - Detailed formulas and configurations for log rotation and stateful storage retention.

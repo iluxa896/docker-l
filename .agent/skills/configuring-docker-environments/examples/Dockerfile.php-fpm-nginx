@@ -1,0 +1,92 @@
+# ==============================================================================
+# Enterprise Multi-Stage Dockerfile: PHP 8.3-FPM + Nginx (Hardened Production)
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# Stage 1: Build & Composer Dependency Resolution
+# ------------------------------------------------------------------------------
+FROM php:8.3-cli-alpine AS vendor-builder
+WORKDIR /build
+
+# Install system build dependencies and unzip
+RUN apk add --no-cache \
+    git \
+    unzip \
+    libzip-dev \
+    libpng-dev \
+    libjpeg-turbo-dev \
+    freetype-dev \
+    icu-dev
+
+# Install PHP build extensions
+RUN docker-php-ext-configure gd --with-freetype --with-jpeg && \
+    docker-php-ext-install -j$(nproc) pdo_mysql bcmath intl opcache zip gd
+
+# Install official Composer binary
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+
+# Copy only dependency manifests first for maximum layer caching
+COPY composer.json composer.lock ./
+
+# Install production dependencies without dev packages, scripts, or autoloader bloat
+RUN composer install \
+    --no-dev \
+    --no-interaction \
+    --prefer-dist \
+    --optimize-autoloader \
+    --no-scripts
+
+# ------------------------------------------------------------------------------
+# Stage 2: Hardened Production Runtime (PHP-FPM + Nginx)
+# ------------------------------------------------------------------------------
+FROM php:8.3-fpm-alpine AS runner
+WORKDIR /var/www/html
+
+# Install runtime packages: Nginx, Tini init process, and runtime libraries
+RUN apk add --no-cache \
+    nginx \
+    tini \
+    libzip \
+    libpng \
+    libjpeg-turbo \
+    freetype \
+    icu-libs
+
+# Copy compiled PHP extensions from builder
+COPY --from=vendor-builder /usr/local/lib/php/extensions /usr/local/lib/php/extensions
+COPY --from=vendor-builder /usr/local/etc/php/conf.d /usr/local/etc/php/conf.d
+
+# Configure OPcache for Production Performance
+RUN echo "opcache.enable=1" >> /usr/local/etc/php/conf.d/docker-php-ext-opcache.ini && \
+    echo "opcache.enable_cli=0" >> /usr/local/etc/php/conf.d/docker-php-ext-opcache.ini && \
+    echo "opcache.memory_consumption=256" >> /usr/local/etc/php/conf.d/docker-php-ext-opcache.ini && \
+    echo "opcache.interned_strings_buffer=16" >> /usr/local/etc/php/conf.d/docker-php-ext-opcache.ini && \
+    echo "opcache.max_accelerated_files=20000" >> /usr/local/etc/php/conf.d/docker-php-ext-opcache.ini && \
+    echo "opcache.validate_timestamps=0" >> /usr/local/etc/php/conf.d/docker-php-ext-opcache.ini && \
+    echo "opcache.save_comments=1" >> /usr/local/etc/php/conf.d/docker-php-ext-opcache.ini
+
+# Security: Create dedicated non-root application system user and group
+RUN addgroup -S appgroup -g 10001 && \
+    adduser -S appuser -u 10001 -G appgroup
+
+# Configure directories and socket permissions for non-root user
+RUN mkdir -p /var/run/php /var/lib/nginx/logs /var/lib/nginx/tmp && \
+    chown -R appuser:appgroup /var/www/html /var/run/php /var/lib/nginx /var/log/nginx
+
+# Copy vendor artifacts and application source
+COPY --from=vendor-builder --chown=appuser:appgroup /build/vendor /var/www/html/vendor
+COPY --chown=appuser:appgroup . /var/www/html
+
+# Switch execution context to unprivileged user
+USER appuser:appgroup
+
+EXPOSE 8080
+
+# Healthcheck to verify PHP-FPM and HTTP response
+HEALTHCHECK --interval=20s --timeout=5s --start-period=10s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:8080/health || exit 1
+
+# Tini init system intercepts signals and forwards to app process
+ENTRYPOINT ["/sbin/tini", "--"]
+
+CMD ["php-fpm", "-F"]

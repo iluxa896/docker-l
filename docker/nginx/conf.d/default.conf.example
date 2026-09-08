@@ -18,7 +18,13 @@ server {
     add_header X-Content-Type-Options "nosniff" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
     add_header Permissions-Policy "geolocation=(), camera=(), microphone=(), payment=()" always;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
     add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https: https://images.unsplash.com https://cdn.ozon.ru https://ir.ozone.ru; connect-src 'self' ws: wss:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'" always;
+
+    # 301 Redirect www to non-www mirror
+    if ($host ~* ^www\.(.+)$) {
+        return 301 $scheme://$1$request_uri;
+    }
 
     index index.php;
 
@@ -29,6 +35,8 @@ server {
     gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript;
 
     location / {
+        # 301 Redirect trailing slashes for non-directories
+        rewrite ^/(.+)/$ /$1 permanent;
         try_files $uri $uri/ /index.php?$query_string;
     }
 
@@ -107,6 +115,11 @@ server {
         fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
         include fastcgi_params;
         fastcgi_hide_header X-Powered-By;
+        fastcgi_hide_header X-Frame-Options;
+        fastcgi_hide_header X-Content-Type-Options;
+        fastcgi_hide_header Referrer-Policy;
+        fastcgi_hide_header Permissions-Policy;
+        fastcgi_hide_header Content-Security-Policy;
         fastcgi_connect_timeout 2s;
         fastcgi_send_timeout 60s;
         fastcgi_read_timeout 60s;

@@ -1,8 +1,11 @@
 server {
     listen 80;
     listen [::]:80;
+    http2 on;
     server_name localhost;
     root /var/www/html/public;
+
+    ssl_session_cache shared:SSL:10m;
 
     absolute_redirect off;
     server_tokens off;

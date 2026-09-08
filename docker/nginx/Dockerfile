@@ -19,7 +19,4 @@ RUN chmod +x /entrypoint.sh
 
 ENTRYPOINT ["/entrypoint.sh"]
 
-HEALTHCHECK --interval=15s --timeout=5s --start-period=5s --retries=3 \
-  CMD curl -f http://127.0.0.1/healthz || exit 1
-
 CMD ["nginx", "-g", "daemon off;"]

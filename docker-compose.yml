@@ -85,13 +85,9 @@ services:
       - ./docker/nginx/letsencrypt:/etc/letsencrypt
       - ./docker/nginx/letsencrypt-lib:/var/lib/letsencrypt
       - ./docker/nginx/letsencrypt-acme:/var/www/acme-challenge
-    # Nginx starts immediately to serve maintenance page while app-init / app are booting
+    # Disable container healthcheck for Nginx to prevent 404 polling on custom virtual host / SSL setups
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://127.0.0.1/healthz || exit 1"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 5s
+      disable: true
     deploy:
       resources:
         limits:
@@ -298,6 +294,8 @@ services:
       - ./docker/data/beszel_socket:/beszel_socket
       - ./docker/data/beszel:/beszel_data:ro
     depends_on:
+      beszel-init:
+        condition: service_completed_successfully
       beszel:
         condition: service_started
     deploy:

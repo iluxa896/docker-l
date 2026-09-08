@@ -8,12 +8,19 @@ DB_FILE="$DATA_DIR/data.db"
 
 mkdir -p "$DATA_DIR"
 
-# 1. If private key exists, extract public key for beszel-agent
-if [ -f "$DATA_DIR/id_ed25519" ]; then
-    echo "[beszel-init] Extracting Ed25519 public key for agent authentication..."
-    ssh-keygen -y -f "$DATA_DIR/id_ed25519" > "$DATA_DIR/id_ed25519.pub" 2>/dev/null || true
-    chmod 644 "$DATA_DIR/id_ed25519.pub" 2>/dev/null || true
+# 1. Ensure Ed25519 SSH keypair exists for Beszel Hub & Agent authentication
+if [ ! -f "$DATA_DIR/id_ed25519" ]; then
+    echo "[beszel-init] Generating initial Ed25519 SSH keypair for Beszel Hub & Agent..."
+    ssh-keygen -t ed25519 -N "" -f "$DATA_DIR/id_ed25519" -C "beszel"
 fi
+
+if [ ! -f "$DATA_DIR/id_ed25519.pub" ]; then
+    echo "[beszel-init] Extracting Ed25519 public key for agent authentication..."
+    ssh-keygen -y -f "$DATA_DIR/id_ed25519" > "$DATA_DIR/id_ed25519.pub"
+fi
+
+chmod 600 "$DATA_DIR/id_ed25519" 2>/dev/null || true
+chmod 644 "$DATA_DIR/id_ed25519.pub" 2>/dev/null || true
 
 if [ ! -f "$DB_FILE" ]; then
     echo "[beszel-init] Initializing: database $DB_FILE does not exist yet."

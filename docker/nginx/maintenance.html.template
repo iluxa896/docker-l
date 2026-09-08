@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="robots" content="noindex, nofollow">
+    <meta http-equiv="refresh" content="12">
+    <title>Техническое обслуживание — __APP_NAME__</title>
+    <style>
+        :root {
+            --bg-gradient: linear-gradient(135deg, #faf8f5 0%, #f4eee6 50%, #f0ede6 100%);
+            --card-bg: rgba(255, 255, 255, 0.88);
+            --card-border: rgba(230, 222, 214, 0.9);
+            --primary: #5c7f67;
+            --primary-light: #eaf1ec;
+            --text-main: #2d3748;
+            --text-muted: #718096;
+            --accent: #d97706;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: var(--bg-gradient);
+            color: var(--text-main);
+            min-height: 100vh;
+            min-height: 100dvh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1.5rem;
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 520px;
+            width: 100%;
+            background: var(--card-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--card-border);
+            border-radius: 24px;
+            padding: 2.75rem 2rem;
+            text-align: center;
+            box-shadow: 0 20px 40px -15px rgba(92, 127, 103, 0.12),
+                        0 0 1px rgba(0, 0, 0, 0.08);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .icon-wrapper {
+            width: 88px;
+            height: 88px;
+            margin: 0 auto 1.5rem;
+            border-radius: 50%;
+            background: var(--primary-light);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--primary);
+            box-shadow: inset 0 2px 4px rgba(92, 127, 103, 0.15);
+            animation: pulse-ring 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        @keyframes pulse-ring {
+            0%, 100% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.05);
+            }
+        }
+
+        .icon-wrapper svg {
+            width: 44px;
+            height: 44px;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            border-radius: 9999px;
+            background: #fef3c7;
+            color: #92400e;
+            font-size: 0.8125rem;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+            margin-bottom: 1.25rem;
+        }
+
+        .badge-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #d97706;
+            animation: blink 1.5s ease-in-out infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        h1 {
+            font-size: 1.625rem;
+            font-weight: 700;
+            color: #1a202c;
+            margin-bottom: 0.75rem;
+            letter-spacing: -0.015em;
+        }
+
+        p {
+            font-size: 0.975rem;
+            color: var(--text-muted);
+            margin-bottom: 1.5rem;
+        }
+
+        .progress-box {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 14px;
+            padding: 1rem 1.25rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 0.875rem;
+            color: #4a5568;
+            margin-bottom: 1.75rem;
+        }
+
+        .progress-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .progress-spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid #cbd5e1;
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .brand-footer {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            font-size: 0.8125rem;
+            color: #a0aec0;
+            border-top: 1px solid #edf2f7;
+            padding-top: 1.25rem;
+        }
+
+        .brand-footer strong {
+            color: #718096;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon-wrapper">
+            <!-- Sparkles & Gift Craft Icon -->
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20 12v10H4V12"/>
+                <path d="M2 7h20v5H2z"/>
+                <path d="M12 22V7"/>
+                <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/>
+                <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/>
+            </svg>
+        </div>
+
+        <div class="badge">
+            <span class="badge-dot"></span>
+            Обновление системы
+        </div>
+
+        <h1>Скоро вернёмся онлайн!</h1>
+        <p>
+            Мы обновляем каталог и улучшаем магазин авторских подарков <strong>__APP_NAME__</strong>. 
+            Это займёт буквально пару минут.
+        </p>
+
+        <div class="progress-box">
+            <div class="progress-label">
+                <div class="progress-spinner"></div>
+                <span>Идёт применение обновления...</span>
+            </div>
+            <span id="countdown">12 сек</span>
+        </div>
+
+        <div class="brand-footer">
+            <span>© __APP_NAME__</span>
+            <span>•</span>
+            <span>Авторские подарки и милые вещи</span>
+        </div>
+    </div>
+
+    <script>
+        // Automatic countdown display before meta-refresh triggers
+        var count = 12;
+        var countdownEl = document.getElementById('countdown');
+        if (countdownEl) {
+            var interval = setInterval(function() {
+                count--;
+                if (count <= 0) {
+                    countdownEl.textContent = 'Обновляем...';
+                    clearInterval(interval);
+                    window.location.reload();
+                } else {
+                    countdownEl.textContent = count + ' сек';
+                }
+            }, 1000);
+        }
+    </script>
+</body>
+</html>

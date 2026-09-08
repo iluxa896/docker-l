@@ -74,21 +74,21 @@ services:
     ports:
       - "80:80"
       - "443:443"
+    environment:
+      - APP_NAME=${APP_NAME:-Магазин}
     volumes:
       - ./:/var/www/html:ro
       - ./docker/nginx/conf.d:/etc/nginx/conf.d
       - ./docker/nginx/letsencrypt:/etc/letsencrypt
       - ./docker/nginx/letsencrypt-lib:/var/lib/letsencrypt
       - ./docker/nginx/letsencrypt-acme:/var/www/acme-challenge
-    depends_on:
-      app:
-        condition: service_healthy
+    # Nginx starts immediately to serve maintenance page while app-init / app are booting
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://127.0.0.1/robots.txt || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://127.0.0.1/healthz || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 3
-      start_period: 10s
+      start_period: 5s
     deploy:
       resources:
         limits:

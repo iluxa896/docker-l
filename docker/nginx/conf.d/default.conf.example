@@ -81,12 +81,30 @@ server {
         proxy_pass $beszel_upstream;
     }
 
+    # Lightweight liveness probe for Docker container healthcheck
+    location = /healthz {
+        access_log off;
+        default_type text/plain;
+        return 200 "OK\n";
+    }
+
     location = /favicon.ico { access_log off; log_not_found off; }
     location = /robots.txt  { access_log off; log_not_found off; try_files $uri /index.php?$query_string; }
 
+    # Intercept upstream errors (502/504 when PHP-FPM container is booting or down) and return 503 Maintenance Page
+    fastcgi_intercept_errors on;
+    error_page 502 503 504 =503 /maintenance.html;
     error_page 404 /index.php;
 
+    location = /maintenance.html {
+        root /usr/share/nginx/html;
+        internal;
+        add_header Cache-Control "no-store, no-cache, must-revalidate" always;
+        add_header Retry-After 60 always;
+    }
+
     location ~ \.php$ {
+        try_files $uri =404;
         fastcgi_pass app:9000;
         fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
         include fastcgi_params;
@@ -96,7 +114,16 @@ server {
         fastcgi_read_timeout 60s;
     }
 
+    # Block access to hidden files and sensitive project files
     location ~ /\.(?!well-known).* {
         deny all;
+        access_log off;
+        log_not_found off;
+    }
+
+    location ~* (\.env|\.git|\.yml|\.yaml|\.sql|\.bak|\.inc|\.conf|\.sh)$ {
+        deny all;
+        access_log off;
+        log_not_found off;
     }
 }

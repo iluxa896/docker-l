@@ -20,6 +20,12 @@ if [ ! -f /etc/nginx/conf.d/default.conf ] && [ -f /etc/nginx/conf.d/default.con
     cp /etc/nginx/conf.d/default.conf.example /etc/nginx/conf.d/default.conf
 fi
 
+# Dynamically substitute store name from APP_NAME (.env) into maintenance page
+STORE_NAME="${APP_NAME:-Магазин}"
+if [ -f /usr/share/nginx/html/maintenance.html.template ]; then
+    sed "s|__APP_NAME__|${STORE_NAME}|g" /usr/share/nginx/html/maintenance.html.template > /usr/share/nginx/html/maintenance.html
+fi
+
 # Start cron service in the background
 service cron start
 

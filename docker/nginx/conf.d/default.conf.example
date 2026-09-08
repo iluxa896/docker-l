@@ -104,12 +104,13 @@ server {
     }
 
     location ~ \.php$ {
-        try_files $uri =404;
-        fastcgi_pass app:9000;
+        resolver 127.0.0.11 valid=5s ipv6=off;
+        set $app_upstream app:9000;
+        fastcgi_pass $app_upstream;
         fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
         include fastcgi_params;
         fastcgi_hide_header X-Powered-By;
-        fastcgi_connect_timeout 60s;
+        fastcgi_connect_timeout 2s;
         fastcgi_send_timeout 60s;
         fastcgi_read_timeout 60s;
     }

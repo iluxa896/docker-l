@@ -17,19 +17,26 @@ if [[ "$1" == "--build" || "$1" == "-b" ]]; then
     BUILD_FLAG="--build"
 fi
 
-# 3. Recreate app-init and app containers with zero web server downtime
-# Nginx, PostgreSQL, and Redis remain running uninterrupted.
-# Nginx immediately catches 502/504 and serves the branded 503 Maintenance Page
-# while app-init installs Composer packages, compiles Vite assets, and runs migrations.
-echo "📦 Recreating application workers (app-init, app, queue, scheduler)..."
+# 3. Ensure Nginx web server is running and updated with latest config
+echo "🌐 Ensuring Nginx web server is active..."
+docker compose up -d $BUILD_FLAG web
+
+# 4. Explicitly stop app container so Nginx immediately serves 503 Maintenance Page
+# for the ENTIRE duration of app-init (Vite asset build, Composer install, migrations).
+echo "🛑 Activating maintenance mode (Nginx serves 503 page)..."
+docker compose stop app
+
+# 5. Run app-init to completion (Vite build, Composer, migrations).
+# Once app-init completes successfully, Docker Compose automatically starts app (PHP-FPM).
+echo "📦 Running app-init and recreating application workers..."
 docker compose up -d $BUILD_FLAG --force-recreate app-init app queue scheduler
 
-# 4. Safe prune of dangling images left behind from builds (leaves active images & volumes untouched)
+# 6. Safe prune of dangling images left behind from builds (leaves active images & volumes untouched)
 echo "🧹 Cleaning up obsolete dangling images..."
 docker image prune -f
 
 echo "=================================================="
-echo "✅ [Deploy] Deployment launched successfully!"
+echo "✅ [Deploy] Deployment process initialized!"
 echo "   • Nginx is running continuously on ports 80/443"
 echo "   • Serving 503 Maintenance Page with 12s auto-refresh"
 echo "   • Will switch to live store automatically once app-init completes"

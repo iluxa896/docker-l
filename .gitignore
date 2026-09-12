@@ -23,6 +23,9 @@ history.md
 laravel
 /docker/dozzle/users.yml
 /docker/data/
+/docker/backups/*
+!/docker/backups/.gitkeep
+
 
 # SSL & Let's Encrypt Volumes and Keys
 /docker/letsencrypt/

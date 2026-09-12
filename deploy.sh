@@ -29,7 +29,8 @@ docker compose stop app
 # 5. Run app-init to completion (Vite build, Composer, migrations).
 # Once app-init completes successfully, Docker Compose automatically starts app (PHP-FPM).
 echo "📦 Running app-init and recreating application workers..."
-docker compose up -d $BUILD_FLAG --force-recreate app-init app queue scheduler
+docker compose up -d $BUILD_FLAG --force-recreate app-init app queue scheduler postgres-backup
+
 
 # 6. Safe prune of dangling images left behind from builds (leaves active images & volumes untouched)
 echo "🧹 Cleaning up obsolete dangling images..."

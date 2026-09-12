@@ -36,6 +36,7 @@ if [ -f package-lock.json ]; then
 else
     npm install --no-audit
 fi
+export NODE_OPTIONS="--max-old-space-size=2048"
 npm run build
 
 # 7. Storage Symlink (Guards against physical folders and dangling/broken symlinks)

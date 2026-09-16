@@ -110,7 +110,6 @@ server {
     # Intercept upstream errors (502/504 when PHP-FPM container is booting or down) and return 503 Maintenance Page
     fastcgi_intercept_errors on;
     error_page 502 503 504 =503 /maintenance.html;
-    error_page 404 /index.php;
 
     location = /maintenance.html {
         root /usr/share/nginx/html;
@@ -122,9 +121,11 @@ server {
     location ~ \.php$ {
         resolver 127.0.0.11 valid=5s ipv6=off;
         set $app_upstream app:9000;
+        include fastcgi_params;
         fastcgi_pass $app_upstream;
         fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
-        include fastcgi_params;
+        fastcgi_param SERVER_NAME $host;
+        fastcgi_param HTTP_X_FORWARDED_HOST $host;
         fastcgi_hide_header X-Powered-By;
         fastcgi_hide_header X-Frame-Options;
         fastcgi_hide_header X-Content-Type-Options;
